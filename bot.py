@@ -24,15 +24,18 @@ def load_properties_config(path):
 if len(sys.argv) > 1:
     config_path = sys.argv[1]
     config = load_properties_config(config_path)
+    # Set all config values as environment variables for downstream code
+    for k, v in config.items():
+        os.environ[k] = v
 else:
     print("No .properties config file provided! Exiting.")
     sys.exit(1)
 
-DISCORD_BOT_TOKEN = config.get('DISCORD_TOKEN')
-BOT_PREFIX = config.get('BOT_PREFIX', '!')
-GUILD_ID = int(config.get('GUILD_ID', 0))
-MAIN_CHANNEL_ID = int(config.get('MAIN_CHANNEL_ID', 0))
-RAIDEYE_SERVER = config.get('RAIDEYE_SERVER', 'http://127.0.0.1:8000')
+DISCORD_BOT_TOKEN = os.environ.get('DISCORD_TOKEN')
+BOT_PREFIX = os.environ.get('BOT_PREFIX', '!')
+GUILD_ID = int(os.environ.get('GUILD_ID', 0))
+MAIN_CHANNEL_ID = int(os.environ.get('MAIN_CHANNEL_ID', 0))
+RAIDEYE_SERVER = os.environ.get('RAIDEYE_SERVER', 'http://127.0.0.1:8000')
 
 # Bot configuration
 INTENTS = discord.Intents.default()

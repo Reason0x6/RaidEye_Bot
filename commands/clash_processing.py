@@ -20,10 +20,9 @@ class HydraChimeraCommands(commands.Cog):
             self.server_url = f'http://{self.server_url}'
         self.api_url = f"{self.server_url}/api/discord"
         
-        # Clan mapping from environment or clans.json
-        self.clan_map = {}
-        self._load_clan_map()
-        
+        # Clan list fetched from API
+        self.clan_list = []
+
         # Add context menu commands
         self.ctx_menu_hydra = app_commands.ContextMenu(
             name='Process as Hydra',
@@ -31,25 +30,27 @@ class HydraChimeraCommands(commands.Cog):
             type=discord.AppCommandType.message
         )
         self.ctx_menu_chimera = app_commands.ContextMenu(
-            name='Process as Chimera', 
+            name='Process as Chimera',
             callback=self.context_chimera,
             type=discord.AppCommandType.message
         )
-        
         self.bot.tree.add_command(self.ctx_menu_hydra)
         self.bot.tree.add_command(self.ctx_menu_chimera)
     
-    def _load_clan_map(self):
-        """Load clan mapping from clans.json or environment variable"""
+    async def cog_load(self):
+        """Called when the cog is loaded"""
+        self.aiohttp_session = aiohttp.ClientSession()
+        # Fetch clan list from API
         try:
-            clan_map_env = os.getenv('DISCORD_CLAN_MAP')
-            if clan_map_env:
-                self.clan_map = json.loads(clan_map_env)
-            elif os.path.exists('clans.json'):
-                with open('clans.json', 'r') as f:
-                    self.clan_map = json.load(f)
+            async with self.aiohttp_session.get(f"{self.api_url}/clans/") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    self.clan_list = data.get('clans', [])
+                    logging.info(f"Loaded clans: {self.clan_list}")
+                else:
+                    logging.warning(f"Failed to fetch clans from API: HTTP {resp.status}")
         except Exception as e:
-            logging.warning(f"Failed to load clan map: {e}")
+            logging.warning(f"Error fetching clans from API: {e}")
     
     async def cog_load(self):
         """Called when the cog is loaded"""
@@ -327,7 +328,7 @@ class HydraChimeraCommands(commands.Cog):
 
                             
                             # 3. Send the string in the 'content' argument along with the embed
-                            await interaction.followup.send(content=assignments_text+towers_text, allowed_mentions=discord.AllowedMentions(users=True))
+                            await interaction.followup.send(content=assignments_text, allowed_mentions=discord.AllowedMentions(users=True))
 
                             
                         except Exception as parse_error:
@@ -384,78 +385,12 @@ class HydraChimeraCommands(commands.Cog):
     
     async def context_hydra(self, interaction: discord.Interaction, message: discord.Message):
         """Context menu: Process message as Hydra clash"""
-        await interaction.response.send_modal(ClanTokenModal(message, "hydra", self))
-    
+        await interaction.response.send_modal(ClanTokenModal(message, "hydra", self, self.clan_list))
+
     async def context_chimera(self, interaction: discord.Interaction, message: discord.Message):
         """Context menu: Process message as Chimera clash"""
-        await interaction.response.send_modal(ClanTokenModal(message, "chimera", self))
+        await interaction.response.send_modal(ClanTokenModal(message, "chimera", self, self.clan_list))
     
-    # @app_commands.command(name="extract-images", description="Extract and analyze images from a message")
-    # @app_commands.describe(
-    #     message_link="Discord message link containing images",
-    #     prompt_type="Type of analysis to perform on the images"
-    # )
-    # @app_commands.choices(prompt_type=[
-    #     app_commands.Choice(name="Hydra Clash Record", value="hydra clash record"),
-    #     app_commands.Choice(name="Chimera Clash Record", value="chimera clash record"),
-    #     app_commands.Choice(name="Personal Scores", value="personal scores"),
-    #     app_commands.Choice(name="Custom Analysis", value="custom"),
-    # ])
-    # async def extract_images(
-    #     self, 
-    #     interaction: discord.Interaction, 
-    #     message_link: str,
-    #     prompt_type: app_commands.Choice[str]
-    # ):
-    #     """Extract and analyze images using the server's extraction endpoint"""
-    #     await interaction.response.defer(thinking=True)
-        
-    #     try:
-    #         # Parse message link
-    #         parts = message_link.strip().split('/')
-    #         message_id = int(parts[-1])
-    #         channel_id = int(parts[-2])
-    #         channel = await self.bot.fetch_channel(channel_id)
-    #         message = await channel.fetch_message(message_id)
-    #     except Exception as e:
-    #         await interaction.followup.send(f"❌ Failed to fetch message: {e}")
-    #         return
-        
-    #     # Extract images and send to analysis
-    #     try:
-    #         images = await self._extract_images_from_message(message)
-    #         if not images:
-    #             await interaction.followup.send("❌ No images found in the specified message.")
-    #             return
-            
-    #         results = []
-    #         for img_data, filename in images:
-    #             result = await self._post_image_extraction(img_data, filename, prompt_type.value)
-    #             results.append(result)
-            
-    #         # Format response
-    #         response_text = f"📊 **Image Analysis Results**\n"
-    #         response_text += f"🖼️ Analyzed {len(images)} image(s)\n"
-    #         response_text += f"🔍 Analysis Type: {prompt_type.name}\n\n"
-            
-    #         for i, result in enumerate(results, 1):
-    #             if result['success']:
-    #                 response_text += f"**Image {i}:** ✅ Success\n"
-    #                 if isinstance(result['data'], dict):
-    #                     # Format structured data nicely
-    #                     for key, value in result['data'].items():
-    #                         if key != 'rotation':  # Skip rotation data
-    #                             response_text += f"  • {key}: {value}\n"
-    #                 else:
-    #                     response_text += f"  • Result: {result['data']}\n"
-    #             else:
-    #                 response_text += f"**Image {i}:** ❌ Failed - {result.get('error', 'Unknown error')}\n"
-    #             response_text += "\n"
-            
-    #         await interaction.followup.send(response_text[:2000])  # Discord message limit
-            
-    #     except Exception as e:
-    #         await interaction.followup.send(f"❌ Error extracting images: {e}")
     
     async def _process_clash_message(self, message: discord.Message, clash_type: str, clan_token: str, dry_run: bool = False):
         """Process a message for clash data"""
@@ -475,30 +410,20 @@ class HydraChimeraCommands(commands.Cog):
         try:
             if not images:
                 return {'success': False, 'error': 'No images provided'}
-            
             # Process first image (assuming one score image per request)
             img_data, filename = images[0]
-            
             # Extract data from image
             extraction_result = await self._post_image_extraction(img_data, filename, f"{clash_type} clash record")
             if not extraction_result['success']:
                 return {'success': False, 'error': f"Image extraction failed: {extraction_result.get('error')}"}
-            
-            # Resolve clan token if provided
-            resolved_clan = None
-            if clan_token:
-                resolved_clan = self.clan_map.get(str(clan_token), clan_token)
-            
             # Prepare payload for injection
             payload = {
                 "opponent_scores": extraction_result['data'],
                 "date_recorded": discord.utils.utcnow().isoformat().replace("+00:00", "Z")
             }
-            
             # Only add clan if provided
-            if resolved_clan:
-                payload["clan"] = resolved_clan
-            
+            if clan_token:
+                payload["clan"] = clan_token
             if dry_run:
                 return {
                     'success': True,
@@ -506,7 +431,6 @@ class HydraChimeraCommands(commands.Cog):
                     'dry_run_payload': json.dumps(payload, indent=2),
                     'message': 'DRY RUN - Would send this payload'
                 }
-            
             # Send to injection endpoint
             inject_result = await self._inject_clash_data(payload, clash_type)
             if inject_result['success']:
@@ -514,7 +438,6 @@ class HydraChimeraCommands(commands.Cog):
                 clash_id_key = f"{clash_type}_clash_id"
                 clash_id = inject_result['data'].get(clash_id_key)
                 view_url = f"{self.server_url}/{clash_type}/{clash_id}/edit/" if clash_id else None
-                
                 return {
                     'success': True,
                     'image_count': len(images),
@@ -523,7 +446,6 @@ class HydraChimeraCommands(commands.Cog):
                 }
             else:
                 return {'success': False, 'error': f"Injection failed: {inject_result.get('error')}"}
-        
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
@@ -619,18 +541,18 @@ class HydraChimeraCommands(commands.Cog):
 class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
     """Modal dialog to collect clan token for processing"""
     
-    def __init__(self, message: discord.Message, clash_type: str, cog: HydraChimeraCommands):
+    def __init__(self, message: discord.Message, clash_type: str, cog: HydraChimeraCommands, clan_list: list):
         super().__init__()
         self.message = message
         self.clash_type = clash_type
         self.cog = cog
-        
-        # Create the clan token input with conditional requirements
-        self.clan_token = discord.ui.TextInput(
-            label='Clan Token/ID',
-            placeholder='Enter your clan identifier (e.g., 1, 2, clan_name)',
-            required=clash_type != 'hydra',  # Optional for hydra, required for chimera
-            max_length=50
+        self.clan_list = clan_list
+        # Use a dropdown for clan selection
+        self.clan_token = discord.ui.Select(
+            placeholder='Select your clan',
+            options=[discord.SelectOption(label=clan, value=clan) for clan in clan_list],
+            min_values=0 if clash_type == 'hydra' else 1,
+            max_values=1
         )
         self.add_item(self.clan_token)
     
@@ -644,16 +566,13 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
     
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
-        
         try:
-            is_dry_run = self.dry_run.value.lower().startswith('y')
-            clan_token_value = self.clan_token.value.strip() if self.clan_token.value else None
-            
+            is_dry_run = self.dry_run.value.lower().startswith('y') if hasattr(self, 'dry_run') else False
+            clan_token_value = self.clan_token.values[0] if self.clan_token.values else None
             # For chimera, clan token is required
             if self.clash_type == 'chimera' and not clan_token_value:
                 await interaction.followup.send("❌ Clan token is required for Chimera processing.")
                 return
-            
             # Process the message
             result = await self.cog._process_clash_message(
                 self.message, 
@@ -661,27 +580,22 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
                 clan_token_value,
                 dry_run=is_dry_run
             )
-            
             if result['success']:
                 embed = discord.Embed(
                     title=f"✅ {self.clash_type.title()} Processing Complete",
                     color=discord.Color.green()
                 )
-                
                 embed.add_field(name="🏰 Clan", value=clan_token_value or "Not specified", inline=True)
                 embed.add_field(name="📊 Images", value=str(result.get('image_count', 0)), inline=True)
                 embed.add_field(name="🔄 Mode", value="Dry Run" if is_dry_run else "Live", inline=True)
-                
                 if result.get('view_url') and not is_dry_run:
                     embed.add_field(name="🔗 View Record", value=f"[Click Here]({result['view_url']})", inline=False)
-                
                 if result.get('dry_run_payload'):
                     # For dry run, show preview
                     preview = result['dry_run_payload'][:1000]
                     if len(result['dry_run_payload']) > 1000:
                         preview += "\n... (truncated)"
                     embed.add_field(name="📋 Preview Payload", value=f"```json\n{preview}\n```", inline=False)
-                
                 embed.set_footer(text=f"Processed from message {self.message.id}")
                 await interaction.followup.send(embed=embed)
             else:
@@ -691,7 +605,6 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
                     color=discord.Color.red()
                 )
                 await interaction.followup.send(embed=embed)
-        
         except Exception as e:
             await interaction.followup.send(f"❌ Error processing {self.clash_type}: {e}")
     
