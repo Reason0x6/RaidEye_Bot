@@ -14,13 +14,8 @@ pids=()
 for file in bots/*.properties; do
   if [ -f "$file" ]; then
     echo "Starting bot with config $file"
-    # Export each property as an environment variable
-    set -a
-    source "$file"
-    set +a
-    # Run the bot in the background, prefixing output with the config filename
     prefix=$(basename "$file")
-    stdbuf -oL python bot.py 2>&1 | sed "s/^/[$prefix] /" &
+    stdbuf -oL python bot.py "$file" 2>&1 | sed "s/^/[$prefix] /" &
     pids+=("$!")
   fi
 

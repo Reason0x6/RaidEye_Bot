@@ -2,9 +2,37 @@ import discord
 from discord.ext import commands
 import asyncio
 
+
 import os
+import sys
 from pathlib import Path
-from config import DISCORD_BOT_TOKEN, BOT_PREFIX, GUILD_ID, MAIN_CHANNEL_ID
+import configparser
+
+# Read config from .properties file passed as first argument
+def load_properties_config(path):
+    config = {}
+    with open(path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' in line:
+                k, v = line.split('=', 1)
+                config[k.strip()] = v.strip()
+    return config
+
+if len(sys.argv) > 1:
+    config_path = sys.argv[1]
+    config = load_properties_config(config_path)
+else:
+    print("No .properties config file provided! Exiting.")
+    sys.exit(1)
+
+DISCORD_BOT_TOKEN = config.get('DISCORD_TOKEN')
+BOT_PREFIX = config.get('BOT_PREFIX', '!')
+GUILD_ID = int(config.get('GUILD_ID', 0))
+MAIN_CHANNEL_ID = int(config.get('MAIN_CHANNEL_ID', 0))
+RAIDEYE_SERVER = config.get('RAIDEYE_SERVER', 'http://127.0.0.1:8000')
 
 # Bot configuration
 INTENTS = discord.Intents.default()
