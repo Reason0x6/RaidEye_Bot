@@ -40,7 +40,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: ${{ env.REGISTRY }}/reason0x6/RaidEye_Bot
+          images: ${{ env.REGISTRY }}/reason0x6/raideye_bot
           tags: |
             type=raw,value=${{ github.ref_name }}
             type=ref,event=branch
@@ -53,7 +53,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/reason0x6/RaidEye_Bot:${{ github.ref_name }}
+          tags: ${{ env.REGISTRY }}/reason0x6/raideye_bot:${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
       
       # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
