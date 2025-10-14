@@ -18,8 +18,8 @@ for file in bots/*.properties; do
     set -a
     source "$file"
     set +a
-    # Run the bot in the background
-    python bot.py &
+    # Run the bot in the background, prefixing output with the config filename
+    stdbuf -oL python bot.py 2>&1 | sed "s/^/[$file] /" &
     pids+=("$!")
   fi
 
