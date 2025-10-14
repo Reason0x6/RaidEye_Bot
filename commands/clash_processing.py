@@ -10,6 +10,82 @@ from typing import Optional, Literal
 from config import GUILD_ID, MAIN_CHANNEL_ID
 
 class HydraChimeraCommands(commands.Cog):
+     
+    async def _post_image_extraction(self, img_data: bytes, filename: str, prompt_type: str):
+        """Send image to extraction endpoint"""
+        try:
+            url = f"{self.api_url}/extract/personal_scores/"
+            
+            data = aiohttp.FormData()
+            data.add_field('images', img_data, filename=filename, content_type='image/png')
+            data.add_field('prompt_type', prompt_type)
+            
+            async with self.aiohttp_session.post(url, data=data) as resp:
+                text = await resp.text()
+                if 200 <= resp.status < 300:
+                    try:
+                        result_data = await resp.json()
+                        return {'success': True, 'data': result_data}
+                    except:
+                        return {'success': True, 'data': text}
+                else:
+                    return {'success': False, 'error': f"HTTP {resp.status}: {text}"}
+        
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    async def _inject_clash_data(self, payload: dict, clash_type: str):
+        """Send clash data to injection endpoint"""
+        try:
+            url = f"{self.api_url}/injest-{clash_type}/"
+            headers = {"Content-Type": "application/json"}
+            
+            async with self.aiohttp_session.post(url, data=json.dumps(payload), headers=headers) as resp:
+                text = await resp.text()
+                if 200 <= resp.status < 300:
+                    try:
+                        result_data = await resp.json()
+                        return {'success': True, 'data': result_data}
+                    except:
+                        return {'success': True, 'data': {'message': text}}
+                else:
+                    return {'success': False, 'error': f"HTTP {resp.status}: {text}"}
+        
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def _is_valid_image_attachment(self, attachment: discord.Attachment) -> bool:
+        """Check if the attachment is a valid image file"""
+        if not attachment.filename:
+            return False
+        valid_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
+        filename_lower = attachment.filename.lower()
+        has_valid_ext = any(filename_lower.endswith(ext) for ext in valid_extensions)
+        has_valid_content_type = attachment.content_type and attachment.content_type.startswith('image/')
+        return has_valid_ext or has_valid_content_type
+    async def _extract_images_from_message(self, message: discord.Message):
+        """Extract valid image attachments from a Discord message."""
+        images = []
+        # Check attachments
+        for attachment in getattr(message, 'attachments', []):
+            if self._is_valid_image_attachment(attachment):
+                try:
+                    img_data = await attachment.read()
+                    images.append((img_data, attachment.filename))
+                except Exception as e:
+                    logging.warning(f"Failed to read attachment: {e}")
+        # Optionally, check embeds for images
+        for embed in getattr(message, 'embeds', []):
+            if embed.image and embed.image.url:
+                try:
+                    async with self.aiohttp_session.get(embed.image.url) as resp:
+                        if resp.status == 200:
+                            img_data = await resp.read()
+                            filename = os.path.basename(embed.image.url)
+                            images.append((img_data, filename))
+                except Exception as e:
+                    logging.warning(f"Failed to fetch embed image: {e}")
+        return images
     """Hydra and Chimera clash processing commands"""
     
     def __init__(self, bot):
@@ -36,7 +112,7 @@ class HydraChimeraCommands(commands.Cog):
         )
         self.bot.tree.add_command(self.ctx_menu_hydra)
         self.bot.tree.add_command(self.ctx_menu_chimera)
-    
+
     async def cog_load(self):
         """Called when the cog is loaded"""
         self.aiohttp_session = aiohttp.ClientSession()
@@ -46,15 +122,14 @@ class HydraChimeraCommands(commands.Cog):
                 if resp.status == 200:
                     data = await resp.json()
                     self.clan_list = data.get('clans', [])
+                    print(f"[clash_processing] Loaded clans: {self.clan_list}")
                     logging.info(f"Loaded clans: {self.clan_list}")
                 else:
+                    print(f"[clash_processing] Failed to fetch clans from API: HTTP {resp.status}")
                     logging.warning(f"Failed to fetch clans from API: HTTP {resp.status}")
         except Exception as e:
+            print(f"[clash_processing] Error fetching clans from API: {e}")
             logging.warning(f"Error fetching clans from API: {e}")
-    
-    async def cog_load(self):
-        """Called when the cog is loaded"""
-        self.aiohttp_session = aiohttp.ClientSession()
     
     async def cog_unload(self):
         """Called when the cog is unloaded"""
@@ -385,13 +460,25 @@ class HydraChimeraCommands(commands.Cog):
     
     async def context_hydra(self, interaction: discord.Interaction, message: discord.Message):
         """Context menu: Process message as Hydra clash"""
-        await interaction.response.send_modal(ClanTokenModal(message, "hydra", self, self.clan_list))
+        if not self.clan_list:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            await interaction.followup.send("❌ Clan list is not loaded. Please try again later.", ephemeral=True)
+            print("[clash_processing] Clan list is empty when context_hydra called!")
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        view = ClanSelectView(message, "hydra", self, self.clan_list, interaction.user)
+        await interaction.followup.send("Select your clan for Hydra clash:", view=view, ephemeral=True)
 
     async def context_chimera(self, interaction: discord.Interaction, message: discord.Message):
         """Context menu: Process message as Chimera clash"""
-        await interaction.response.send_modal(ClanTokenModal(message, "chimera", self, self.clan_list))
-    
-    
+        if not self.clan_list:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            await interaction.followup.send("❌ Clan list is not loaded. Please try again later.", ephemeral=True)
+            print("[clash_processing] Clan list is empty when context_chimera called!")
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        view = ClanSelectView(message, "chimera", self, self.clan_list, interaction.user)
+        await interaction.followup.send("Select your clan for Chimera clash:", view=view, ephemeral=True)
     async def _process_clash_message(self, message: discord.Message, clash_type: str, clan_token: str, dry_run: bool = False):
         """Process a message for clash data"""
         try:
@@ -399,12 +486,10 @@ class HydraChimeraCommands(commands.Cog):
             images = await self._extract_images_from_message(message)
             if not images:
                 return {'success': False, 'error': 'No images found'}
-            
             return await self._process_clash_images(images, clash_type, clan_token, dry_run)
-        
         except Exception as e:
             return {'success': False, 'error': str(e)}
-    
+
     async def _process_clash_images(self, images: list, clash_type: str, clan_token: Optional[str], dry_run: bool = False):
         """Process images for clash data"""
         try:
@@ -448,94 +533,23 @@ class HydraChimeraCommands(commands.Cog):
                 return {'success': False, 'error': f"Injection failed: {inject_result.get('error')}"}
         except Exception as e:
             return {'success': False, 'error': str(e)}
-    
-    async def _extract_images_from_message(self, message: discord.Message):
-        """Extract all images from a Discord message"""
-        images = []
-        
-        # Process attachments
-        for attachment in message.attachments:
-            if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
-                img_data = await attachment.read()
-                images.append((img_data, attachment.filename))
-        
-        # Process embeds
-        for embed in message.embeds:
-            image_url = None
-            if embed.image and embed.image.url:
-                image_url = embed.image.url
-            elif embed.thumbnail and embed.thumbnail.url:
-                image_url = embed.thumbnail.url
-            
-            if image_url:
-                try:
-                    async with self.aiohttp_session.get(image_url) as resp:
-                        if resp.status == 200:
-                            img_data = await resp.read()
-                            filename = os.path.basename(image_url.split('?')[0])
-                            images.append((img_data, filename))
-                except Exception as e:
-                    logging.warning(f"Failed to download embed image {image_url}: {e}")
-        
-        return images
-    
-    async def _post_image_extraction(self, img_data: bytes, filename: str, prompt_type: str):
-        """Send image to extraction endpoint"""
-        try:
-            url = f"{self.api_url}/extract/personal_scores/"
-            
-            data = aiohttp.FormData()
-            data.add_field('images', img_data, filename=filename, content_type='image/png')
-            data.add_field('prompt_type', prompt_type)
-            
-            async with self.aiohttp_session.post(url, data=data) as resp:
-                text = await resp.text()
-                if 200 <= resp.status < 300:
-                    try:
-                        result_data = await resp.json()
-                        return {'success': True, 'data': result_data}
-                    except:
-                        return {'success': True, 'data': text}
-                else:
-                    return {'success': False, 'error': f"HTTP {resp.status}: {text}"}
-        
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    async def _inject_clash_data(self, payload: dict, clash_type: str):
-        """Send clash data to injection endpoint"""
-        try:
-            url = f"{self.api_url}/injest-{clash_type}/"
-            headers = {"Content-Type": "application/json"}
-            
-            async with self.aiohttp_session.post(url, data=json.dumps(payload), headers=headers) as resp:
-                text = await resp.text()
-                if 200 <= resp.status < 300:
-                    try:
-                        result_data = await resp.json()
-                        return {'success': True, 'data': result_data}
-                    except:
-                        return {'success': True, 'data': {'message': text}}
-                else:
-                    return {'success': False, 'error': f"HTTP {resp.status}: {text}"}
-        
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
-    
-    def _is_valid_image_attachment(self, attachment: discord.Attachment) -> bool:
-        """Check if the attachment is a valid image file"""
-        if not attachment.filename:
+
+# --- ClanSelectView for dropdown-based clan selection ---
+class ClanSelectView(discord.ui.View):
+    def __init__(self, message: discord.Message, clash_type: str, cog: HydraChimeraCommands, clan_list: list, user: discord.User):
+        super().__init__(timeout=60)
+        self.message = message
+        self.clash_type = clash_type
+        self.cog = cog
+        self.user = user
+        self.add_item(ClanSelectDropdown(clan_list, self))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Only allow the user who invoked the context action to interact
+        if interaction.user.id != self.user.id:
+            await interaction.response.send_message("You cannot interact with this menu.", ephemeral=True)
             return False
-        
-        # Check file extension
-        valid_extensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
-        filename_lower = attachment.filename.lower()
-        has_valid_ext = any(filename_lower.endswith(ext) for ext in valid_extensions)
-        
-        # Check content type if available
-        has_valid_content_type = attachment.content_type and attachment.content_type.startswith('image/')
-        
-        return has_valid_ext or has_valid_content_type
+        return True
 
 
 class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
@@ -547,10 +561,10 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
         self.clash_type = clash_type
         self.cog = cog
         self.clan_list = clan_list
-        # Use a dropdown for clan selection
+        # Use a String Select for clan selection (discord.py handles Action Row)
         self.clan_token = discord.ui.Select(
             placeholder='Select your clan',
-            options=[discord.SelectOption(label=clan, value=clan) for clan in clan_list],
+            options=[discord.SelectOption(label=clan, value=clan) for clan in clan_list[:25]],
             min_values=0 if clash_type == 'hydra' else 1,
             max_values=1
         )
@@ -567,18 +581,17 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
         try:
-            is_dry_run = self.dry_run.value.lower().startswith('y') if hasattr(self, 'dry_run') else False
             clan_token_value = self.clan_token.values[0] if self.clan_token.values else None
             # For chimera, clan token is required
             if self.clash_type == 'chimera' and not clan_token_value:
-                await interaction.followup.send("❌ Clan token is required for Chimera processing.")
+                await interaction.followup.send("❌ Clan name is required for Chimera processing.")
                 return
             # Process the message
             result = await self.cog._process_clash_message(
                 self.message, 
                 self.clash_type, 
                 clan_token_value,
-                dry_run=is_dry_run
+                dry_run=False
             )
             if result['success']:
                 embed = discord.Embed(
@@ -587,11 +600,10 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
                 )
                 embed.add_field(name="🏰 Clan", value=clan_token_value or "Not specified", inline=True)
                 embed.add_field(name="📊 Images", value=str(result.get('image_count', 0)), inline=True)
-                embed.add_field(name="🔄 Mode", value="Dry Run" if is_dry_run else "Live", inline=True)
-                if result.get('view_url') and not is_dry_run:
+                embed.add_field(name="🔄 Mode", value="Live", inline=True)
+                if result.get('view_url'):
                     embed.add_field(name="🔗 View Record", value=f"[Click Here]({result['view_url']})", inline=False)
                 if result.get('dry_run_payload'):
-                    # For dry run, show preview
                     preview = result['dry_run_payload'][:1000]
                     if len(result['dry_run_payload']) > 1000:
                         preview += "\n... (truncated)"
@@ -619,3 +631,48 @@ class ClanTokenModal(discord.ui.Modal, title='Clan Information'):
 async def setup(bot):
     """Setup function called by discord.py when loading this cog"""
     await bot.add_cog(HydraChimeraCommands(bot))
+
+
+class ClanSelectDropdown(discord.ui.Select):
+    def __init__(self, clan_list: list, parent_view: ClanSelectView):
+        options = [discord.SelectOption(label=clan, value=clan) for clan in clan_list[:25]]
+        super().__init__(placeholder="Select your clan", min_values=1, max_values=1, options=options)
+        self.parent_view = parent_view
+
+    async def callback(self, interaction: discord.Interaction):
+        clan_token_value = self.values[0]
+        # Process the message as a clash
+        await interaction.response.defer(thinking=True)
+        result = await self.parent_view.cog._process_clash_message(
+            self.parent_view.message,
+            self.parent_view.clash_type,
+            clan_token_value,
+            dry_run=False
+        )
+        if result['success']:
+            embed = discord.Embed(
+                title=f"✅ {self.parent_view.clash_type.title()} Processing Complete",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="🏰 Clan", value=clan_token_value or "Not specified", inline=True)
+            embed.add_field(name="📊 Images", value=str(result.get('image_count', 0)), inline=True)
+            embed.add_field(name="🔄 Mode", value="Live", inline=True)
+            if result.get('view_url'):
+                embed.add_field(name="🔗 View Record", value=f"[Click Here]({result['view_url']})", inline=False)
+            if result.get('dry_run_payload'):
+                preview = result['dry_run_payload'][:1000]
+                if len(result['dry_run_payload']) > 1000:
+                    preview += "\n... (truncated)"
+                embed.add_field(name="📋 Preview Payload", value=f"```json\n{preview}\n```", inline=False)
+            embed.set_footer(text=f"Processed from message {self.parent_view.message.id}")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            embed = discord.Embed(
+                title=f"❌ {self.parent_view.clash_type.title()} Processing Failed",
+                description=result.get('error', 'Unknown error occurred'),
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+    
+    
+    
