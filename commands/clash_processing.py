@@ -291,7 +291,7 @@ class HydraChimeraCommands(commands.Cog):
                                     selected_arena_team = assignment.get('selected_arena_team', 'No arena team')
                                     
                                     # Format the line
-                                    line = f"Post {post_num} - {player_name if player_name else "No Player Assigned"} - {team_choice if team_choice else 'No Condition Assigned'}"
+                                    line = f"Post {post_num} - {player_name if player_name else 'No Player Assigned'} - {team_choice if team_choice else 'No Condition Assigned'}"
                                     for member in interaction.guild.members:
                                         if member.name == discord_username:
                                            line += f" -> <@{member.id}>" 
