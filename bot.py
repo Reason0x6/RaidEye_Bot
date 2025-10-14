@@ -1,18 +1,16 @@
 import discord
 from discord.ext import commands
 import asyncio
+
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 from config import DISCORD_BOT_TOKEN, BOT_PREFIX, GUILD_ID, MAIN_CHANNEL_ID
-
-# Load environment variables from .env file if it exists
-load_dotenv()
 
 # Bot configuration
 INTENTS = discord.Intents.default()
 INTENTS.message_content = True
 INTENTS.guilds = True
+INTENTS.members = True
 
 class RaidEyeBot(commands.Bot):
     def __init__(self):

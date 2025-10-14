@@ -10,12 +10,13 @@ load_dotenv()
 
 # Discord Configuration
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-BOT_PREFIX = os.getenv('BOT_PREFIX', '/')
+BOT_PREFIX = os.environ.get("BOT_PREFIX", "!")
 DEBUG_MODE = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
 
 # Server and Channel Configuration
 GUILD_ID = int(os.getenv('GUILD_ID', 710875600637788170))  # Your Discord server ID
-MAIN_CHANNEL_ID = int(os.getenv('MAIN_CHANNEL_ID', 1420969870933102662))  # Your main channel ID
+MAIN_CHANNEL_ID = int(os.environ.get("MAIN_CHANNEL_ID", 0))
+RAIDEYE_SERVER = os.environ.get("RAIDEYE_SERVER", "http://127.0.0.1:8000")
 
 # Additional configuration options
 BOT_NAME = "RaidEye Bot"

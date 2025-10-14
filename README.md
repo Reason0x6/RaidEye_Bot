@@ -1,25 +1,44 @@
-# RaidEye Discord Bot
+# 🤖 RaidEye Discord Bot
 
-A modular Discord bot built with discord.py that focuses on raid management and clan activities. The bot is designed with extensibility in mind, making it easy to add new slash commands.
+A powerful, modular Discord bot built with discord.py that specializes in raid management, clan activities, and image processing for gaming communities. The bot features modern slash commands, context menus, and seamless integration with RaidEye server for advanced image analysis.
 
-## Features
+## ✨ Features
 
-- **Slash Commands**: Modern Discord slash command support
-- **Modular Design**: Easy to add new commands by creating new files
-- **Clan Management**: Built-in clan information and management commands
-- **Raid Scheduling**: Track and display raid schedules
+### 🎯 **Core Functionality**
+- **Modern Slash Commands**: Full Discord slash command support with autocomplete
+- **Context Menus**: Right-click any message to process images instantly
+- **Image Processing**: Advanced image analysis for clash records and statistics
+- **Clan Management**: Comprehensive clan information and statistics system
+- **Modular Design**: Easy to extend with new commands and features
 - **Auto-sync**: Automatically syncs commands with Discord on startup
 
-## Setup
+### 🖼️ **Image Processing**
+- **Hydra & Chimera Clash Processing**: Extract data from game screenshots
+- **Batch Processing**: Process multiple images from message history
+- **Direct Upload**: Attach images directly to slash commands
+- **URL Analysis**: Process images from any web URL
+- **Smart Detection**: Automatic clash type detection from message content
+
+### 🏰 **Clan Features**
+- **Real-time Statistics**: Live clan stats and performance metrics
+- **Member Tracking**: Monitor clan member activity and performance
+- **Raid Scheduling**: Track and display raid schedules and events
+- **Multi-clan Support**: Handle multiple clans with token mapping
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
 - Python 3.8 or higher
-- A Discord application and bot token
+- Discord application with bot token
+- RaidEye server (for image processing features)
 
 ### Installation
 
-1. **Clone or download this project**
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd RaidEye_Discord_bot
+   ```
 
 2. **Create a virtual environment**:
    ```powershell
@@ -32,134 +51,269 @@ A modular Discord bot built with discord.py that focuses on raid management and 
    pip install -r requirements.txt
    ```
 
-4. **Set up your Discord bot**:
-   - Go to https://discord.com/developers/applications
-   - Create a new application
-   - Go to the "Bot" section and create a bot
-   - Copy the bot token
-
-5. **Configure environment variables**:
+4. **Configure environment**:
    ```powershell
-   # Set your bot token as an environment variable
-   $env:DISCORD_BOT_TOKEN="your_bot_token_here"
+   # Copy the template
+   copy .env.template .env
+   
+   # Edit .env with your actual values
+   notepad .env
    ```
 
-6. **Invite your bot to a server**:
-   - In the Discord Developer Portal, go to OAuth2 > URL Generator
-   - Select "bot" and "applications.commands" scopes
-   - Select necessary permissions (Send Messages, Use Slash Commands, etc.)
-   - Use the generated URL to invite your bot
+5. **Set up Discord bot**:
+   - Go to https://discord.com/developers/applications
+   - Create new application → Bot section → Copy token
+   - Add token to your `.env` file
+
+6. **Generate invite link**:
+   ```powershell
+   python generate_invite.py
+   ```
 
 7. **Run the bot**:
    ```powershell
-   python bot.py
+   python start.py
    ```
 
-## Available Commands
+## 📋 Available Commands
 
-- `/info` - Get information about the bot
-- `/ping` - Check the bot's response time
-- `/help` - Get help with bot commands
-- `/clan-info <clan_name>` - Get information about a specific clan
-- `/clan-list` - List all clans in the database
-- `/raid-schedule` - Check the current raid schedule
+### 🏛️ **Clash Processing**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `/hydra` | Process Hydra clash images | `clan_token`, `image`, `message_link`, `dry_run` |
+| `/chimera` | Process Chimera clash images | `clan_token`, `image`, `message_link`, `dry_run` |
+| **Context Menu** | Right-click → "Process as Hydra/Chimera" | Opens modal for clan input |
 
-## Adding New Commands
+### 📊 **Clan Management**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `/clan-stats` | Get detailed clan statistics | `include_image`, `message_link` |
+| `/clan-info-query` | Query specific clan information | `query_type`, `clan_filter` |
+| `/server-status` | Check RaidEye server connectivity | - |
 
-The bot is designed for easy extensibility. To add new commands:
+### 🖼️ **Image Processing**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `/scan-images` | Scan messages for images | `channel`, `limit`, `image_type`, `save_locally` |
+| `/process-batch` | Process multiple images | `channel`, `limit`, `analysis_type`, `auto_detect_type` |
+| `/analyze-url` | Analyze image from URL | `image_url`, `analysis_type` |
 
-1. **Create a new file** in the `commands/` directory (e.g., `commands/new_feature.py`)
+### ℹ️ **Information & Utilities**
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `/info` | Bot information and stats | - |
+| `/ping` | Check bot response time | - |
+| `/help` | Display available commands | - |
+| `/server-info` | Server information | - |
+| `/setup-check` | Verify bot configuration | - |
 
-2. **Use this template**:
-   ```python
-   import discord
-   from discord.ext import commands
-   from discord import app_commands
+### 🔧 **Admin Commands** (Bot Owner Only)
+| Command | Description | Usage |
+|---------|-------------|-------|
+| `!sync` | Manually sync slash commands | - |
+| `!clear` | Clear all slash commands | - |
+| `!list` | List current slash commands | - |
 
-   class NewFeatureCommands(commands.Cog):
-       """Description of your command group"""
-       
-       def __init__(self, bot):
-           self.bot = bot
-       
-       @app_commands.command(name="your-command", description="What your command does")
-       async def your_command(self, interaction: discord.Interaction):
-           """Your command function"""
-           await interaction.response.send_message("Hello from your new command!")
-
-   async def setup(bot):
-       """Setup function - required for all command files"""
-       await bot.add_cog(NewFeatureCommands(bot))
-   ```
-
-3. **Restart the bot** - The bot will automatically load your new commands on startup
-
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 RaidEye_Discord_bot/
-├── bot.py                 # Main bot file
-├── commands/              # Command modules directory
-│   ├── info.py           # Information commands (/info, /ping, /help)
-│   └── clan.py           # Clan management commands
-├── clans.json            # Clan data storage
-├── discord_db.py         # Database utilities (if needed)
-├── requirements.txt      # Python dependencies
-├── .env.example         # Environment variables template
-└── README.md            # This file
+├── 📁 commands/                    # Command modules
+│   ├── 🔍 clash_processing.py     # Hydra/Chimera processing
+│   ├── 📊 clan_stats.py           # Clan statistics
+│   ├── 🖼️ image_processing.py     # Image analysis
+│   ├── 🖱️ context_menus.py        # Right-click commands
+│   ├── ℹ️ info.py                  # Bot information
+│   ├── 🏰 clan.py                 # Clan management
+│   ├── 🖥️ server.py               # Server utilities
+│   └── 📝 _template.py            # Command template
+├── 🤖 bot.py                      # Main bot file
+├── ⚙️ config.py                   # Configuration management
+├── 🔧 start.py                    # Startup script with checks
+├── 🔗 generate_invite.py          # Bot invite link generator
+├── 🗂️ manage_commands.py          # Command management utility
+├── 🧹 clear_commands.py           # Command clearing utility
+├── 📄 requirements.txt            # Python dependencies
+├── 🔒 .env.template               # Environment template
+├── 📚 README.md                   # This file
+├── 📋 COMMANDS_MIGRATION.md       # Migration guide
+└── 🗃️ clans.json                  # Clan data storage
 ```
 
-## Command Categories
+## ⚙️ Configuration
 
-### Information Commands (`commands/info.py`)
-- General bot information
-- Help system
-- Ping/latency checking
+### Environment Variables
 
-### Clan Commands (`commands/clan.py`)
-- Clan information display
-- Clan listing
-- Raid schedule display
+Create a `.env` file using `.env.template` as a guide:
 
-## Configuration
+```env
+# Required
+DISCORD_BOT_TOKEN=your_bot_token_here
+GUILD_ID=your_server_id_here
+MAIN_CHANNEL_ID=your_main_channel_id_here
+RAIDEYE_SERVER=http://localhost:8000
 
-The bot uses environment variables for configuration:
+# Optional
+BOT_PREFIX=!
+DEBUG_MODE=false
+DISCORD_CLAN_MAP={"1": "main_clan", "2": "sister_clan"}
+```
 
-- `DISCORD_BOT_TOKEN` - Your Discord bot token (required)
-- `BOT_PREFIX` - Prefix for text commands (default: `!`)
-- `DEBUG_MODE` - Enable debug logging (default: `False`)
+### Clan Mapping
 
-## Data Storage
+Map short tokens to full clan names for easier user input:
 
-- `clans.json` - Stores clan information and member data
-- Additional data files can be added as needed
+```json
+{
+  "1": "Dragons of Fire",
+  "2": "Phoenix Rising", 
+  "3": "Shadow Wolves"
+}
+```
 
-## Contributing
+Users can then type `/hydra clan_token:1` instead of the full clan name.
 
-To add new features:
+## 🎮 Usage Examples
 
-1. Create new command files in the `commands/` directory
-2. Follow the existing code structure and patterns
-3. Use Discord embeds for rich message formatting
-4. Include proper error handling
-5. Add command descriptions for the help system
+### Processing Clash Results
 
-## Troubleshooting
+```bash
+# Direct image upload (easiest)
+/hydra clan_token:1 image:[attach_screenshot] dry_run:false
 
-### Bot not responding to slash commands
-- Make sure the bot has been invited with the `applications.commands` scope
-- Check that commands are syncing properly (look for sync messages in console)
-- Ensure the bot has necessary permissions in your server
+# From message link
+/chimera clan_token:2 message_link:https://discord.com/channels/.../...
 
-### Environment variable issues
-- Make sure `DISCORD_BOT_TOKEN` is set before running the bot
-- On Windows PowerShell, use: `$env:DISCORD_BOT_TOKEN="your_token"`
+# Right-click method
+Right-click message → Apps → "Process as Hydra" → Enter clan token
+```
 
-### Command not loading
-- Check the console for error messages during startup
-- Ensure your command file has the proper `setup()` function
-- Verify the command file doesn't start with an underscore
+### Batch Processing
 
-## License
+```bash
+# Scan recent messages for clash images
+/scan-images channel:#raids limit:50 image_type:Clash Records Only
+
+# Process multiple images with auto-detection
+/process-batch channel:#results limit:20 auto_detect_type:true
+```
+
+### Getting Statistics
+
+```bash
+# Get clan stats with image
+/clan-stats include_image:true message_link:https://discord.com/...
+
+# Query specific information
+/clan-info-query query_type:Performance Stats clan_filter:Dragons
+```
+
+## 🔧 Adding New Commands
+
+The bot uses a modular command system. To add new commands:
+
+1. **Create a new file** in `commands/` directory:
+
+```python
+import discord
+from discord.ext import commands
+from discord import app_commands
+
+class YourCommands(commands.Cog):
+    """Description of your command group"""
+    
+    def __init__(self, bot):
+        self.bot = bot
+    
+    @app_commands.command(name="your-command", description="Command description")
+    async def your_command(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Hello World!")
+
+async def setup(bot):
+    await bot.add_cog(YourCommands(bot))
+```
+
+2. **Restart the bot** - Commands are auto-loaded on startup
+
+## 🛠️ Management Tools
+
+### Command Management
+```powershell
+# Interactive command manager
+python manage_commands.py
+
+# Quick command clearing
+python clear_commands.py
+
+# Startup with checks
+python start.py
+```
+
+### Bot Invite
+```powershell
+# Generate proper invite link with all permissions
+python generate_invite.py
+```
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Commands not showing in Discord:**
+- Verify bot has `applications.commands` scope
+- Check server permissions
+- Use `!sync` command to manually sync
+
+**Image processing fails:**
+- Verify `RAIDEYE_SERVER` is accessible
+- Check `/server-status` command
+- Ensure images are valid formats (PNG, JPG, etc.)
+
+**Environment issues:**
+- Verify `.env` file exists and has correct values
+- Check `python start.py` for configuration validation
+- Enable `DEBUG_MODE=true` for detailed logging
+
+### Debug Commands
+
+```powershell
+# Check bot configuration
+/setup-check
+
+# Test server connectivity  
+/server-status
+
+# List current commands
+!list
+
+# View bot information
+/info
+```
+
+## 🤝 Contributing
+
+1. **Fork the repository**
+2. **Create feature branch**: `git checkout -b feature/new-feature`
+3. **Follow existing patterns** in `commands/` directory
+4. **Test thoroughly** with dry run mode
+5. **Submit pull request**
+
+### Code Style
+- Use Discord embeds for rich formatting
+- Include proper error handling
+- Add command descriptions and parameter info
+- Follow existing naming conventions
+
+## 📄 License
 
 This project is open source and available under the MIT License.
+
+## 🆘 Support
+
+- **Documentation**: Check `COMMANDS_MIGRATION.md` for detailed command info
+- **Issues**: Report bugs via GitHub issues
+- **Discord**: Join our support server (link in bot info)
+
+---
+
+Built with ❤️ for gaming communities using Discord.py and modern Python practices.
