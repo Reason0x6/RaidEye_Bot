@@ -479,18 +479,18 @@ class HydraChimeraCommands(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         view = ClanSelectView(message, "chimera", self, self.clan_list, interaction.user)
         await interaction.followup.send("Select your clan for Chimera clash:", view=view, ephemeral=True)
-    async def _process_clash_message(self, message: discord.Message, clash_type: str, clan_token: str, dry_run: bool = False):
+    async def _process_clash_message(self, message: discord.Message, clash_type: str, clan_token: str, dry_run: bool = False, date_recorded: Optional[str] = None):
         """Process a message for clash data"""
         try:
             # Extract images from the message
             images = await self._extract_images_from_message(message)
             if not images:
                 return {'success': False, 'error': 'No images found'}
-            return await self._process_clash_images(images, clash_type, clan_token, dry_run)
+            return await self._process_clash_images(images, clash_type, clan_token, dry_run, date_recorded)
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
-    async def _process_clash_images(self, images: list, clash_type: str, clan_token: Optional[str], dry_run: bool = False):
+    async def _process_clash_images(self, images: list, clash_type: str, clan_token: Optional[str], dry_run: bool = False, date_recorded: Optional[str] = None):
         """Process images for clash data"""
         try:
             if not images:
@@ -504,7 +504,7 @@ class HydraChimeraCommands(commands.Cog):
             # Prepare payload for injection
             payload = {
                 "opponent_scores": extraction_result['data'],
-                "date_recorded": discord.utils.utcnow().isoformat().replace("+00:00", "Z")
+                "date_recorded": discord.utils.utcnow().isoformat().replace("+00:00", "Z") if not date_recorded else date_recorded
             }
             # Only add clan if provided
             if clan_token:
@@ -641,38 +641,68 @@ class ClanSelectDropdown(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         clan_token_value = self.values[0]
-        # Process the message as a clash
-        await interaction.response.defer(thinking=True)
-        result = await self.parent_view.cog._process_clash_message(
-            self.parent_view.message,
-            self.parent_view.clash_type,
-            clan_token_value,
-            dry_run=False
-        )
-        if result['success']:
-            embed = discord.Embed(
-                title=f"✅ {self.parent_view.clash_type.title()} Processing Complete",
-                color=discord.Color.green()
-            )
-            embed.add_field(name="🏰 Clan", value=clan_token_value or "Not specified", inline=True)
-            embed.add_field(name="📊 Images", value=str(result.get('image_count', 0)), inline=True)
-            embed.add_field(name="🔄 Mode", value="Live", inline=True)
-            if result.get('view_url'):
-                embed.add_field(name="🔗 View Record", value=f"[Click Here]({result['view_url']})", inline=False)
-            if result.get('dry_run_payload'):
-                preview = result['dry_run_payload'][:1000]
-                if len(result['dry_run_payload']) > 1000:
-                    preview += "\n... (truncated)"
-                embed.add_field(name="📋 Preview Payload", value=f"```json\n{preview}\n```", inline=False)
-            embed.set_footer(text=f"Processed from message {self.parent_view.message.id}")
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            embed = discord.Embed(
-                title=f"❌ {self.parent_view.clash_type.title()} Processing Failed",
-                description=result.get('error', 'Unknown error occurred'),
-                color=discord.Color.red()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+        # Show modal for date input after clan selection
+        parent_view = self.parent_view
+        class DateInputModal(discord.ui.Modal, title="Date Recorded"):
+            def __init__(self, parent_view):
+                super().__init__()
+                self.parent_view = parent_view
+                self.date_recorded = discord.ui.TextInput(
+                    label="Date Recorded (YYYY-MM-DD)",
+                    placeholder="e.g. 2025-10-15 (leave blank for today)",
+                    required=False,
+                    max_length=10
+                )
+                self.add_item(self.date_recorded)
+
+            async def on_submit(self, modal_interaction: discord.Interaction):
+                import datetime
+                from discord.utils import utcnow
+                date_str = self.date_recorded.value.strip()
+                if date_str:
+                    try:
+                        # Use noon to avoid timezone issues, then format as UTC Z
+                        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                        date_obj = date_obj.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.timezone.utc)
+                        date_iso = date_obj.isoformat().replace("+00:00", "Z")
+                    except Exception:
+                        await modal_interaction.response.send_message("❌ Invalid date format. Use YYYY-MM-DD.", ephemeral=True)
+                        return
+                else:
+                    date_iso = utcnow().isoformat().replace("+00:00", "Z")
+                await modal_interaction.response.defer(thinking=True)
+                result = await self.parent_view.cog._process_clash_message(
+                    self.parent_view.message,
+                    self.parent_view.clash_type,
+                    clan_token_value,
+                    dry_run=False,
+                    date_recorded=date_iso
+                )
+                if result['success']:
+                    embed = discord.Embed(
+                        title=f"✅ {self.parent_view.clash_type.title()} Processing Complete",
+                        color=discord.Color.green()
+                    )
+                    embed.add_field(name="🏰 Clan", value=clan_token_value or "Not specified", inline=True)
+                    embed.add_field(name="📊 Images", value=str(result.get('image_count', 0)), inline=True)
+                    embed.add_field(name="🔄 Mode", value="Live", inline=True)
+                    if result.get('view_url'):
+                        embed.add_field(name="🔗 View Record", value=f"[Click Here]({result['view_url']})", inline=False)
+                    if result.get('dry_run_payload'):
+                        preview = result['dry_run_payload'][:1000]
+                        if len(result['dry_run_payload']) > 1000:
+                            preview += "\n... (truncated)"
+                        embed.add_field(name="📋 Preview Payload", value=f"```json\n{preview}\n```", inline=False)
+                    embed.set_footer(text=f"Processed from message {self.parent_view.message.id}")
+                    await modal_interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    embed = discord.Embed(
+                        title=f"❌ {self.parent_view.clash_type.title()} Processing Failed",
+                        description=result.get('error', 'Unknown error occurred'),
+                        color=discord.Color.red()
+                    )
+                    await modal_interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.response.send_modal(DateInputModal(parent_view))
     
     
     
