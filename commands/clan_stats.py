@@ -29,148 +29,148 @@ class ClanStatsCommands(commands.Cog):
         if self.aiohttp_session:
             await self.aiohttp_session.close()
     
-    # @app_commands.command(name="clan-stats", description="Get detailed clan statistics")
-    # async def clan_stats(
-    #     self, 
-    #     interaction: discord.Interaction, 
-    #     include_image: bool = False,
-    #     message_link: Optional[str] = None
-    # ):
-    #     """Fetch and display clan statistics"""
-    #     await interaction.response.defer(thinking=True)
-        
-    #     try:
-    #         # Fetch clan stats from server
-    #         stats_url = f"{self.api_url}/clans/stats/msg"
-            
-    #         async with self.aiohttp_session.get(stats_url) as resp:
-    #             text = await resp.text()
-                
-    #             if 200 <= resp.status < 300:
-    #                 # Parse response
-    #                 try:
-    #                     data = json.loads(text)
-    #                     message_text = data.get("message", str(data)) if isinstance(data, dict) else str(data)
-    #                 except:
-    #                     message_text = text
-                    
-                    
-    #                 # Create embed for better formatting
-    #                 embed = discord.Embed(
-    #                     title="📊 Clan Statistics",
-    #                     description=message_text,
-    #                     color=discord.Color.blue()
-    #                 )
-                    
-    #                 embed.set_footer(text="Data retrieved from RaidEye server")
-    #                 embed.timestamp = discord.utils.utcnow()
-                    
-                    
-    #                 await interaction.followup.send(embed=embed)
-                
-    #             else:
-    #                 # Error response
-    #                 error_embed = discord.Embed(
-    #                     title="❌ Failed to Fetch Clan Stats",
-    #                     description=f"Server returned status {resp.status}",
-    #                     color=discord.Color.red()
-    #                 )
-                    
-    #                 if len(text) <= 1000:
-    #                     error_embed.add_field(name="Error Details", value=f"```{text}```", inline=False)
-    #                     await interaction.followup.send(embed=error_embed)
-    #                 else:
-    #                     error_file = discord.File(io.BytesIO(text.encode('utf-8')), filename="error_details.txt")
-    #                     await interaction.followup.send(embed=error_embed, file=error_file)
-        
-    #     except Exception as e:
-    #         await interaction.followup.send(f"❌ Error fetching clan stats: {e}")
-    
-    @app_commands.command(name="clan-info-query", description="Query specific clan information")
-    @app_commands.describe(
-        query_type="Type of clan information to retrieve",
-        clan_filter="Optional clan identifier to filter results"
-    )
-    @app_commands.choices(query_type=[
-        app_commands.Choice(name="All Clans Overview", value="overview"),
-        app_commands.Choice(name="Active Members", value="members"),
-        app_commands.Choice(name="Recent Activity", value="activity"),
-        app_commands.Choice(name="Performance Stats", value="performance"),
-        app_commands.Choice(name="Raid History", value="raids"),
-    ])
-    async def clan_info_query(
-        self,
-        interaction: discord.Interaction,
-        query_type: app_commands.Choice[str],
-        clan_filter: Optional[str] = None
+    @app_commands.command(name="clan-stats", description="Get detailed clan statistics")
+    async def clan_stats(
+        self, 
+        interaction: discord.Interaction, 
+        include_image: bool = False,
+        message_link: Optional[str] = None
     ):
-        """Query specific types of clan information"""
+        """Fetch and display clan statistics"""
         await interaction.response.defer(thinking=True)
         
         try:
-            # Build query parameters
-            params = {"type": query_type.value}
-            if clan_filter:
-                params["clan"] = clan_filter
+            # Fetch clan stats from server
+            stats_url = f"{self.api_url}/clans/stats/msg"
             
-            # Make request to server
-            query_url = f"{self.api_url}/clans/query"
-            
-            async with self.aiohttp_session.get(query_url, params=params) as resp:
+            async with self.aiohttp_session.get(stats_url) as resp:
+                text = await resp.text()
+                
                 if 200 <= resp.status < 300:
+                    # Parse response
                     try:
-                        data = await resp.json()
+                        data = json.loads(text)
+                        message_text = data.get("message", str(data)) if isinstance(data, dict) else str(data)
                     except:
-                        data = {"message": await resp.text()}
+                        message_text = text
                     
+                    
+                    # Create embed for better formatting
                     embed = discord.Embed(
-                        title=f"📋 {query_type.name}",
-                        color=discord.Color.green()
+                        title="📊 Clan Statistics",
+                        description=message_text,
+                        color=discord.Color.blue()
                     )
                     
-                    if clan_filter:
-                        embed.description = f"Results filtered for clan: **{clan_filter}**"
-                    
-                    # Format the response based on query type
-                    if isinstance(data, dict):
-                        if "clans" in data:
-                            clan_list = []
-                            for clan_name, clan_data in data["clans"].items():
-                                if isinstance(clan_data, dict):
-                                    members = clan_data.get("members", "Unknown")
-                                    level = clan_data.get("level", "Unknown")
-                                    clan_list.append(f"**{clan_name}** - Level {level} ({members} members)")
-                                else:
-                                    clan_list.append(f"**{clan_name}** - {clan_data}")
-                            
-                            embed.add_field(
-                                name="Clans",
-                                value="\n".join(clan_list[:10]) + ("\n..." if len(clan_list) > 10 else ""),
-                                inline=False
-                            )
-                        elif "message" in data:
-                            embed.description = data["message"]
-                        else:
-                            # Generic data formatting
-                            for key, value in list(data.items())[:5]:  # Limit fields
-                                embed.add_field(
-                                    name=key.replace("_", " ").title(),
-                                    value=str(value)[:1000],  # Limit field length
-                                    inline=True
-                                )
-                    else:
-                        embed.description = str(data)[:2000]
-                    
-                    embed.set_footer(text=f"Query: {query_type.name}")
+                    embed.set_footer(text="Data retrieved from RaidEye server")
                     embed.timestamp = discord.utils.utcnow()
+                    
                     
                     await interaction.followup.send(embed=embed)
                 
                 else:
-                    await interaction.followup.send(f"❌ Query failed with status {resp.status}")
+                    # Error response
+                    error_embed = discord.Embed(
+                        title="❌ Failed to Fetch Clan Stats",
+                        description=f"Server returned status {resp.status}",
+                        color=discord.Color.red()
+                    )
+                    
+                    if len(text) <= 1000:
+                        error_embed.add_field(name="Error Details", value=f"```{text}```", inline=False)
+                        await interaction.followup.send(embed=error_embed)
+                    else:
+                        error_file = discord.File(io.BytesIO(text.encode('utf-8')), filename="error_details.txt")
+                        await interaction.followup.send(embed=error_embed, file=error_file)
         
         except Exception as e:
-            await interaction.followup.send(f"❌ Error executing clan query: {e}")
+            await interaction.followup.send(f"❌ Error fetching clan stats: {e}")
+    
+    # @app_commands.command(name="clan-info-query", description="Query specific clan information")
+    # @app_commands.describe(
+    #     query_type="Type of clan information to retrieve",
+    #     clan_filter="Optional clan identifier to filter results"
+    # )
+    # @app_commands.choices(query_type=[
+    #     app_commands.Choice(name="All Clans Overview", value="overview"),
+    #     app_commands.Choice(name="Active Members", value="members"),
+    #     app_commands.Choice(name="Recent Activity", value="activity"),
+    #     app_commands.Choice(name="Performance Stats", value="performance"),
+    #     app_commands.Choice(name="Raid History", value="raids"),
+    # ])
+    # async def clan_info_query(
+    #     self,
+    #     interaction: discord.Interaction,
+    #     query_type: app_commands.Choice[str],
+    #     clan_filter: Optional[str] = None
+    # ):
+    #     """Query specific types of clan information"""
+    #     await interaction.response.defer(thinking=True)
+        
+    #     try:
+    #         # Build query parameters
+    #         params = {"type": query_type.value}
+    #         if clan_filter:
+    #             params["clan"] = clan_filter
+            
+    #         # Make request to server
+    #         query_url = f"{self.api_url}/clans/query"
+            
+    #         async with self.aiohttp_session.get(query_url, params=params) as resp:
+    #             if 200 <= resp.status < 300:
+    #                 try:
+    #                     data = await resp.json()
+    #                 except:
+    #                     data = {"message": await resp.text()}
+                    
+    #                 embed = discord.Embed(
+    #                     title=f"📋 {query_type.name}",
+    #                     color=discord.Color.green()
+    #                 )
+                    
+    #                 if clan_filter:
+    #                     embed.description = f"Results filtered for clan: **{clan_filter}**"
+                    
+    #                 # Format the response based on query type
+    #                 if isinstance(data, dict):
+    #                     if "clans" in data:
+    #                         clan_list = []
+    #                         for clan_name, clan_data in data["clans"].items():
+    #                             if isinstance(clan_data, dict):
+    #                                 members = clan_data.get("members", "Unknown")
+    #                                 level = clan_data.get("level", "Unknown")
+    #                                 clan_list.append(f"**{clan_name}** - Level {level} ({members} members)")
+    #                             else:
+    #                                 clan_list.append(f"**{clan_name}** - {clan_data}")
+                            
+    #                         embed.add_field(
+    #                             name="Clans",
+    #                             value="\n".join(clan_list[:10]) + ("\n..." if len(clan_list) > 10 else ""),
+    #                             inline=False
+    #                         )
+    #                     elif "message" in data:
+    #                         embed.description = data["message"]
+    #                     else:
+    #                         # Generic data formatting
+    #                         for key, value in list(data.items())[:5]:  # Limit fields
+    #                             embed.add_field(
+    #                                 name=key.replace("_", " ").title(),
+    #                                 value=str(value)[:1000],  # Limit field length
+    #                                 inline=True
+    #                             )
+    #                 else:
+    #                     embed.description = str(data)[:2000]
+                    
+    #                 embed.set_footer(text=f"Query: {query_type.name}")
+    #                 embed.timestamp = discord.utils.utcnow()
+                    
+    #                 await interaction.followup.send(embed=embed)
+                
+    #             else:
+    #                 await interaction.followup.send(f"❌ Query failed with status {resp.status}")
+        
+    #     except Exception as e:
+    #         await interaction.followup.send(f"❌ Error executing clan query: {e}")
     
     @app_commands.command(name="server-status", description="Check RaidEye server status and connectivity")
     async def server_status(self, interaction: discord.Interaction):
@@ -198,7 +198,7 @@ class ClanStatsCommands(commands.Cog):
         
         # Test API endpoints
         api_endpoints = [
-            ("Clan Stats", f"{self.api_url}/clans/stats/msg"),
+            ("Clan Stats", f"{self.api_url}/clans/stats"),
             ("Image Extraction", f"{self.api_url}/extract/personal_scores/"),
             ("Hydra Injection", f"{self.api_url}/injest-hydra/"),
             ("Chimera Injection", f"{self.api_url}/injest-chimera/"),

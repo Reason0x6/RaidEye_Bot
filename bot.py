@@ -68,10 +68,22 @@ class RaidEyeBot(commands.Bot):
                 self.tree.copy_global_to(guild=guild)
                 synced = await self.tree.sync(guild=guild)
                 print(f"Synced {len(synced)} command(s) to guild {GUILD_ID}")
+                try:
+                    names = [c.name for c in synced]
+                    if names:
+                        print(f"Commands registered to guild {GUILD_ID}: {', '.join(names)}")
+                except Exception:
+                    pass
             else:
                 # Fallback to global sync
                 synced = await self.tree.sync()
                 print(f"Synced {len(synced)} command(s) globally")
+                try:
+                    names = [c.name for c in synced]
+                    if names:
+                        print(f"Global commands registered: {', '.join(names)}")
+                except Exception:
+                    pass
         except discord.Forbidden:
             print("❌ Bot doesn't have permission to sync commands!")
             print("Make sure the bot was invited with 'applications.commands' scope")

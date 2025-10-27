@@ -13,9 +13,12 @@ pids=()
 
 for file in bots/*.properties; do
   if [ -f "$file" ]; then
-    echo "Starting bot with config $file"
-    prefix=$(basename "$file")
-    stdbuf -oL python bot.py "$file" 2>&1 | sed "s/^/[$prefix] /" &
+  echo "Starting bot with config $file"
+  prefix=$(basename "$file")
+  # Force Python to run unbuffered so prints are emitted immediately
+  # and make sure sed is line-buffered as well so the pipeline doesn't
+  # introduce additional buffering.
+  stdbuf -oL python -u bot.py "$file" 2>&1 | stdbuf -oL sed "s/^/[$prefix] /" &
     pids+=("$!")
   fi
 
