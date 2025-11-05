@@ -250,14 +250,14 @@ class HydraChimeraCommands(commands.Cog):
                 pass
 
             # Process images with the classifier-provided type
-            result = await self._process_clash_images(images, clash_type)
+            result = await self._process_clash_images(images, clash_type, None)
 
             # Build response
             if result.get('success'):
                 view_url = result.get('view_url')
-                reply = f"✅ Auto-processed {clash_type.title()} ({len(images)} image(s))."
+                reply = f"✅ Auto-processed {clash_type.title()} Clash\n"
                 if view_url:
-                    reply += f" View: {view_url}"
+                    reply += f"[View Record]({result['view_url']})"
             else:
                 reply = f"❌ Auto-processing failed: {result.get('error', 'Unknown error')}"
 
