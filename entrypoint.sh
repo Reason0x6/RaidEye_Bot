@@ -2,6 +2,9 @@
 # Entrypoint script to launch a RaidEye bot for each .properties file in bots/
 set -e
 
+apt update
+apt install -y nano
+
 cd /app
 
 if [ ! -d "bots" ]; then
