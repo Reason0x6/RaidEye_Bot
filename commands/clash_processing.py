@@ -142,6 +142,106 @@ class HydraChimeraCommands(commands.Cog):
             self.bot.tree.remove_command(self.ctx_menu_chimera.name, type=discord.AppCommandType.message)
         except Exception as e:
             logging.warning(f"Failed to remove context menu commands: {e}")
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Monitor MAIN_CHANNEL_ID and auto-process images when posted.
+
+        Behavior: the first image is sent to a classifier endpoint (configurable via
+        AUTO_CLASSIFY_ENDPOINT) which should return JSON like { "Clash Type": "Hydra" }
+        or { "Clash Type": "Chimera" }. The returned type determines which processing
+        path is used.
+        """
+        try:
+            # Ignore bot messages
+            if not message or message.author.bot:
+                return
+
+            # Ensure message is from configured guild and channel
+            if not message.guild or int(message.guild.id) != int(GUILD_ID):
+                return
+            if int(message.channel.id) != int(MAIN_CHANNEL_ID):
+                return
+
+            # Extract images
+            images = await self._extract_images_from_message(message)
+            if not images:
+                return
+
+            # Classify the first image by reusing the existing image extraction endpoint
+            # with a prompt_type of 'classify'. The endpoint should return JSON that
+            # includes a type field, e.g. {"type": "Hydra"} or {"type": "Chimera"}.
+            clash_type = None
+            try:
+                img0_data, img0_name = images[0]
+                extraction_result = await self._post_image_extraction(img0_data, img0_name, "classify")
+                if extraction_result.get('success'):
+                    data = extraction_result.get('data')
+                    ctype = None
+                    if isinstance(data, dict):
+                        # Try several common keys
+                        ctype = data.get('Clash Type')
+                    elif isinstance(data, list) and data:
+                        first = data[0]
+                        if isinstance(first, dict):
+                            ctype = first.get('Clash Type')
+                        else:
+                            ctype = str(first)
+                    elif isinstance(data, str):
+                        ctype = data
+                    else:
+                        ctype = None
+
+                    if ctype:
+                        ctype_str = str(ctype).lower()
+                        if 'hydra' in ctype_str:
+                            clash_type = 'hydra'
+                        elif 'chimera' in ctype_str:
+                            clash_type = 'chimera'
+                else:
+                    logging.warning(f"Classifier extraction failed: {extraction_result.get('error')}")
+            except Exception as e:
+                logging.exception(f"Error during classification via extraction endpoint: {e}")
+                clash_type = None
+
+            if not clash_type:
+                # Could not determine type; skip automatic processing
+                try:
+                    await message.reply("❌ Could not classify image type for automatic processing.")
+                except Exception:
+                    pass
+                return
+
+            # Indicate processing
+            try:
+                await message.add_reaction('🔄')
+            except Exception:
+                pass
+
+            # Process images with the classifier-provided type
+            result = await self._process_clash_images(images, clash_type)
+
+            # Build response
+            if result.get('success'):
+                view_url = result.get('view_url')
+                reply = f"✅ Auto-processed {clash_type.title()} ({len(images)} image(s))."
+                if view_url:
+                    reply += f" View: {view_url}"
+            else:
+                reply = f"❌ Auto-processing failed: {result.get('error', 'Unknown error')}"
+
+            # Reply in-channel to the original message
+            try:
+                await message.reply(reply)
+            except Exception:
+                # Fallback: send to channel
+                try:
+                    await message.channel.send(reply)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            logging.exception(f"Error in on_message auto-process: {e}")
     
     @app_commands.command(name="hydra", description="Process images for Hydra clash records")
     @app_commands.describe(
