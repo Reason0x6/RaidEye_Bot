@@ -157,6 +157,21 @@ class HydraChimeraCommands(commands.Cog):
             if not message or message.author.bot:
                 return
 
+            # Also ignore if this bot has already reacted to the message
+            try:
+                bot_user_id = getattr(self.bot.user, 'id', None)
+                if bot_user_id and getattr(message, 'reactions', None):
+                    for react in message.reactions:
+                        try:
+                            async for u in react.users():
+                                if getattr(u, 'id', None) == bot_user_id:
+                                    return
+                        except Exception:
+                            # Some reaction user enumerations can fail; ignore and continue
+                            continue
+            except Exception:
+                # Be conservative: if reaction inspection fails, continue processing
+                return
             # Ensure message is from configured guild and channel
             if not message.guild or int(message.guild.id) != int(GUILD_ID):
                 return
@@ -175,6 +190,7 @@ class HydraChimeraCommands(commands.Cog):
             try:
                 img0_data, img0_name = images[0]
                 extraction_result = await self._post_image_extraction(img0_data, img0_name, "classify")
+                print(f"[clash_processing] Classifier extraction result: {extraction_result}")
                 if extraction_result.get('success'):
                     data = extraction_result.get('data')
                     ctype = None
