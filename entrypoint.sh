@@ -18,7 +18,9 @@ for file in bots/*.properties; do
   # Force Python to run unbuffered so prints are emitted immediately
   # and make sure sed is line-buffered as well so the pipeline doesn't
   # introduce additional buffering.
-  stdbuf -oL python -u bot.py "$file" 2>&1 | stdbuf -oL sed "s/^/[$prefix] /" &
+  # Ensure Python runs unbuffered and force the downstream prefixer to be unbuffered
+  # Use sed -u for unbuffered line output so async prints from cogs appear promptly.
+  PYTHONUNBUFFERED=1 stdbuf -oL python -u bot.py "$file" 2>&1 | sed -u "s/^/[$prefix] /" &
     pids+=("$!")
   fi
 

@@ -216,17 +216,31 @@ class HydraChimeraCommands(commands.Cog):
                             clash_type = 'chimera'
                 else:
                     logging.warning(f"Classifier extraction failed: {extraction_result.get('error')}")
-                    clash_type = "1"
             except Exception as e:
                 logging.exception(f"Error during classification via extraction endpoint: {e}")
-                clash_type = "2"
 
             if clash_type not in ('hydra', 'chimera'):
-                # Could not determine type; skip automatic processing
+                # Could not determine type; include full extraction_result for debugging
                 try:
-                    await message.reply("❌ Could not classify image type for automatic processing.")
+                    dump = json.dumps(extraction_result, indent=2, default=str)
                 except Exception:
-                    pass
+                    dump = str(extraction_result)
+
+                try:
+                    # If small enough to include in message, send inline; otherwise attach as file
+                    if len(dump) <= 1900:
+                        await message.reply(f"❌ Could not classify image type for automatic processing.\n```json\n{dump}\n```")
+                    else:
+                        fp = io.BytesIO(dump.encode('utf-8'))
+                        fname = f"classify_result_{message.id}.json"
+                        file = discord.File(fp, filename=fname)
+                        await message.reply("❌ Could not classify image type for automatic processing. Full result attached.", file=file)
+                except Exception:
+                    # As a last resort, send a short fallback message
+                    try:
+                        await message.reply("❌ Could not classify image type for automatic processing. (failed to attach full result)")
+                    except Exception:
+                        pass
                 return
 
             # Indicate processing
