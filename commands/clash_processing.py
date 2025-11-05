@@ -216,11 +216,12 @@ class HydraChimeraCommands(commands.Cog):
                             clash_type = 'chimera'
                 else:
                     logging.warning(f"Classifier extraction failed: {extraction_result.get('error')}")
+                    clash_type = "1"
             except Exception as e:
                 logging.exception(f"Error during classification via extraction endpoint: {e}")
-                clash_type = None
+                clash_type = "2"
 
-            if not clash_type:
+            if clash_type not in ('hydra', 'chimera'):
                 # Could not determine type; skip automatic processing
                 try:
                     await message.reply("❌ Could not classify image type for automatic processing.")
