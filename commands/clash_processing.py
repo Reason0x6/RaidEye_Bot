@@ -485,6 +485,7 @@ class HydraChimeraCommands(commands.Cog):
                                 color=discord.Color.blue()
                             )
                             assignments_text = ""
+                            towers_text = ""
                             # Format assignments
                             if assignments:
                                 
@@ -515,26 +516,33 @@ class HydraChimeraCommands(commands.Cog):
                                 assignments_text = "No Assignments"
                                 pass
                             
-                            # towers_text = "\n\n"
-                            # # Format towers
-                            # if towers:
-                               
-                            #     for i, tower in enumerate(towers, 1):
-                            #         # Format tower info based on structure (adjust as needed)
-                            #         if isinstance(tower, dict):
-                            #             tower_info = str(tower)
-                            #         else:
-                            #             tower_info = str(tower)
-                            #         towers_text += f"Tower {i}: {tower_info}\n"
+                            if towers:
                                 
-                               
-                            # else:
-                            #     towers_text += "No Tower Assigments"
+                                for tower in towers:
+                                    tower_number = tower.get('tower_number', '')
+                                    tower_choice = tower.get('tower_choice', '')
+                                    t_display = f"Tower {tower_number} {tower_choice} | Group {getattr(tower, 'tower_group', None)}"
+                                    assigned_player = assignment.get('assigned_player') or {}
+                                    player_name = assigned_player.get('name', '')
+                                    discord_username = assigned_player.get('discord', '')
+                                    
+                                    # Format the line
+                                    line = f"{t_display} - {player_name if player_name else 'No Player Assigned'}"
+                                    for member in interaction.guild.members:
+                                        if member.name == discord_username:
+                                           line += f" -> <@{member.id}>" 
+
+                                    towers_text += line + "\n"
+                                
+                            else:
+                                towers_text = "No Assignments"
+                                pass
                             
+                            post_text = f"**Posts:**\n{assignments_text}\n**Towers:**\n{towers_text}"
 
                             
                             # 3. Send the string in the 'content' argument along with the embed
-                            await interaction.followup.send(content=assignments_text, allowed_mentions=discord.AllowedMentions(users=True))
+                            await interaction.followup.send(content=post_text, allowed_mentions=discord.AllowedMentions(users=True))
 
                             
                         except Exception as parse_error:
