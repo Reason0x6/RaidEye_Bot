@@ -332,12 +332,56 @@ class HydraChimeraCommands(commands.Cog):
         
         # Process each image separately
         try:
+            # Process first image with the declared clash type, then send any
+            # remaining images as extraction-only results to be aggregated.
             results = []
-            for img_data, filename in images_to_process:
-                single_result = await self._process_clash_images([(img_data, filename)], "hydra", clan_token, dry_run)
-                results.append(single_result)
+            first_img = images_to_process[0]
+            first_result = await self._process_clash_images([first_img], "hydra", clan_token, dry_run)
+            results.append(first_result)
 
-            success_count = sum(1 for r in results if r.get('success'))
+            remaining_extractions = []
+            # Process remaining images (extraction-only)
+            for img_data, filename in images_to_process[1:]:
+                res = await self._process_clash_images([(img_data, filename)], "", clan_token, dry_run)
+                results.append(res)
+                if res.get('success') and 'extraction' in res:
+                    remaining_extractions.append(res['extraction'])
+
+            # If first image resulted in a real clash (injection), and we have
+            # extra extraction results, POST them to /api/clash-scores/ to add
+            # the additional scores to the created activity.
+            aggregate_post_result = None
+            if first_result.get('success') and not dry_run:
+                clash_id = first_result.get('clash_id')
+                clash_type_val = first_result.get('clash_type')
+                if clash_id and remaining_extractions:
+                    # Build scores payload from remaining extractions.
+                    scores_payload = None
+                    if len(remaining_extractions) == 1:
+                        scores_payload = remaining_extractions[0]
+                    else:
+                        scores_payload = remaining_extractions
+
+                    body = {
+                        'activity_id': clash_id,
+                        'activity_type': clash_type_val,
+                        'scores': scores_payload
+                    }
+                    try:
+                        url = f"{self.server_url}/api/clash-scores/"
+                        async with self.aiohttp_session.post(url, json=body) as resp:
+                            text = await resp.text()
+                            if 200 <= resp.status < 300:
+                                try:
+                                    aggregate_post_result = await resp.json()
+                                except Exception:
+                                    aggregate_post_result = {'message': text}
+                            else:
+                                aggregate_post_result = {'error': f"HTTP {resp.status}: {text}"}
+                    except Exception as e:
+                        aggregate_post_result = {'error': str(e)}
+
+            # Build response text for the user
             response_text = f"✅ **Hydra Clash Processed**\n"
             response_text += f"📊 Processed {len(images_to_process)} image(s)\n"
             response_text += f"🏰 Clan: {clan_token or 'Not specified'}\n"
@@ -352,6 +396,12 @@ class HydraChimeraCommands(commands.Cog):
                         response_text += f"\nPreview: ```json\n{preview}\n```"
                 else:
                     response_text += f"\nImage {idx}: ❌ Failed - {result.get('error', 'Unknown error')}"
+
+            if aggregate_post_result:
+                if aggregate_post_result.get('error'):
+                    response_text += f"\n\n⚠️ Failed to aggregate extra scores: {aggregate_post_result.get('error')}"
+                else:
+                    response_text += "\n\n✅ Extra scores aggregated to activity"
 
             if dry_run:
                 response_text += f"\n\n**DRY RUN - No data was actually sent**"
@@ -418,12 +468,56 @@ class HydraChimeraCommands(commands.Cog):
         
         # Process each image separately
         try:
+            # Process first image with the declared clash type, then send any
+            # remaining images as extraction-only results to be aggregated.
             results = []
-            for img_data, filename in images_to_process:
-                single_result = await self._process_clash_images([(img_data, filename)], "chimera", clan_token, dry_run)
-                results.append(single_result)
+            first_img = images_to_process[0]
+            first_result = await self._process_clash_images([first_img], "chimera", clan_token, dry_run)
+            results.append(first_result)
 
-            success_count = sum(1 for r in results if r.get('success'))
+            remaining_extractions = []
+            # Process remaining images (extraction-only)
+            for img_data, filename in images_to_process[1:]:
+                res = await self._process_clash_images([(img_data, filename)], "", clan_token, dry_run)
+                results.append(res)
+                if res.get('success') and 'extraction' in res:
+                    remaining_extractions.append(res['extraction'])
+
+            # If first image resulted in a real clash (injection), and we have
+            # extra extraction results, POST them to /api/clash-scores/ to add
+            # the additional scores to the created activity.
+            aggregate_post_result = None
+            if first_result.get('success') and not dry_run:
+                clash_id = first_result.get('clash_id')
+                clash_type_val = first_result.get('clash_type')
+                if clash_id and remaining_extractions:
+                    # Build scores payload from remaining extractions.
+                    scores_payload = None
+                    if len(remaining_extractions) == 1:
+                        scores_payload = remaining_extractions[0]
+                    else:
+                        scores_payload = remaining_extractions
+
+                    body = {
+                        'activity_id': clash_id,
+                        'activity_type': clash_type_val,
+                        'scores': scores_payload
+                    }
+                    try:
+                        url = f"{self.server_url}/api/clash-scores/"
+                        async with self.aiohttp_session.post(url, json=body) as resp:
+                            text = await resp.text()
+                            if 200 <= resp.status < 300:
+                                try:
+                                    aggregate_post_result = await resp.json()
+                                except Exception:
+                                    aggregate_post_result = {'message': text}
+                            else:
+                                aggregate_post_result = {'error': f"HTTP {resp.status}: {text}"}
+                    except Exception as e:
+                        aggregate_post_result = {'error': str(e)}
+
+            # Build response text for the user
             response_text = f"✅ **Chimera Clash Processed**\n"
             response_text += f"📊 Processed {len(images_to_process)} image(s)\n"
             response_text += f"🏰 Clan: {clan_token}\n"
@@ -438,6 +532,12 @@ class HydraChimeraCommands(commands.Cog):
                         response_text += f"\nPreview: ```json\n{preview}\n```"
                 else:
                     response_text += f"\nImage {idx}: ❌ Failed - {result.get('error', 'Unknown error')}"
+
+            if aggregate_post_result:
+                if aggregate_post_result.get('error'):
+                    response_text += f"\n\n⚠️ Failed to aggregate extra scores: {aggregate_post_result.get('error')}"
+                else:
+                    response_text += "\n\n✅ Extra scores aggregated to activity"
 
             if dry_run:
                 response_text += f"\n\n**DRY RUN - No data was actually sent**"
@@ -640,7 +740,7 @@ class HydraChimeraCommands(commands.Cog):
             extraction_result = await self._post_image_extraction(img_data, filename, f"{clash_type} clash record")
             if not extraction_result['success']:
                 return {'success': False, 'error': f"Image extraction failed: {extraction_result.get('error')}"}
-            # Prepare payload for injection
+            # Prepare payload for injection or return extraction-only when clash_type is falsy
             payload = {
                 "opponent_scores": extraction_result['data'],
                 "date_recorded": discord.utils.utcnow().isoformat().replace("+00:00", "Z") if not date_recorded else date_recorded
@@ -655,10 +755,21 @@ class HydraChimeraCommands(commands.Cog):
                     'dry_run_payload': json.dumps(payload, indent=2),
                     'message': 'DRY RUN - Would send this payload'
                 }
+            # If clash_type is falsy, don't call the injection endpoint — return
+            # the extracted scores so the caller can POST them to the proper
+            # aggregate endpoint (/api/clash-scores/).
+            if not clash_type:
+                return {
+                    'success': True,
+                    'image_count': len(images),
+                    'extraction': extraction_result['data'],
+                    'message': 'Extraction-only result'
+                }
+
             # Send to injection endpoint
             inject_result = await self._inject_clash_data(payload, clash_type)
             if inject_result['success']:
-                # Generate view URL
+                # Generate view URL and include clash id for later aggregation
                 clash_id_key = f"{clash_type}_clash_id"
                 clash_id = inject_result['data'].get(clash_id_key)
                 view_url = f"{self.server_url}/{clash_type}/{clash_id}/edit/" if clash_id else None
@@ -666,6 +777,8 @@ class HydraChimeraCommands(commands.Cog):
                     'success': True,
                     'image_count': len(images),
                     'view_url': view_url,
+                    'clash_id': clash_id,
+                    'clash_type': clash_type,
                     'message': inject_result['data'].get('message', 'Successfully processed')
                 }
             else:
