@@ -13,6 +13,7 @@ if [ ! -d "bots" ]; then
 fi
 
 pids=()
+bot_count=0
 
 for file in bots/*.properties; do
   if [ -f "$file" ]; then
@@ -25,11 +26,22 @@ for file in bots/*.properties; do
   # Use sed -u for unbuffered line output so async prints from cogs appear promptly.
   PYTHONUNBUFFERED=1 stdbuf -oL python -u bot.py "$file" 2>&1 | sed -u "s/^/[$prefix] /" &
     pids+=("$!")
+    bot_count=$((bot_count + 1))
   fi
 
 done
 
-# Wait for all background bots to finish
-for pid in "${pids[@]}"; do
-  wait $pid
-done
+if [ $bot_count -eq 0 ]; then
+  echo "No bot configuration files found. Keeping container alive..."
+  echo "To add a bot, mount a .properties file in the bots/ directory"
+  # Keep container running indefinitely
+  tail -f /dev/null
+else
+  echo "Started $bot_count bot(s)"
+  # Wait for all background bots to finish, but keep container alive even if they exit
+  for pid in "${pids[@]}"; do
+    wait $pid
+  done
+  echo "All bots have exited. Keeping container alive..."
+  tail -f /dev/null
+fi
